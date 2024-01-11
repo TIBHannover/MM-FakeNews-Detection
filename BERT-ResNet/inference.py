@@ -5,6 +5,9 @@ from BERTResNet import simpleModel,build_loaders,CFG,valid_epoch,round_output
 from transformers import BertTokenizer
 from sklearn.metrics import classification_report
 
+rootdir_results='./output_wellD_data/03-29-2022_14;07;37/'
+rootdir_data='./well_distributed_data/'
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def report_to_json(reports,outdir):
     import json
     reports['avg precision'] = reports['weighted avg']['precision']
@@ -18,24 +21,20 @@ def report_to_json(reports,outdir):
     with open(outdir+'/Creports_100samples_test_similar_image.json', 'w') as fp:
         json.dump(reports, fp)
 
-rootdir_results='./output_wellD_data/03-29-2022_14;07;37/'
-rootdir_data='./well_distributed_data/'
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 # Load the model
 model = simpleModel()
 model.load_state_dict(torch.load(rootdir_results+'best.pt'))
 model.to(device)
 model.eval()
-# Load the test Data features and labels
+# Load the test Data and labels
 test_df=pd.read_csv(rootdir_data+'100samples_test_similar_image.csv')
 test_labels=test_df['label']
 
 # Set static image and text for static experiment
-
 #test_df['imageId(s)']='blank.png'
 #test_df['tweetText']='This is a sentence.'
 #test_df.to_csv(rootdir_data+'/test_only_text.csv',index=False )
+
 tokenizer = BertTokenizer.from_pretrained(CFG.text_tokenizer)
 # Build data_Loader
 test_loader = build_loaders(test_df, tokenizer, mode="test")
