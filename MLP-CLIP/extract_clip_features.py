@@ -67,3 +67,4 @@ train_features = extract_features(train_df, dataset_path, model, preprocess)
 
 print('Saving training data')
 np.save(dataset_path+'test_clip_features.npy', train_features)
+
