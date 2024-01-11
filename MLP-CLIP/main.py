@@ -10,17 +10,7 @@ from tqdm.autonotebook import tqdm
 import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report
 import pickle
-
-#batch_size = 128
-
-batch_size = 64
-lr = 1e-5
-epochs =30
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-dropout = 0.4
-
-
+import argparse
 
 class early_fusion_model(nn.Module):
     def __init__(self,dropout):
@@ -68,7 +58,7 @@ class late_fusion_model(nn.Module):
 
         return output
 
-def train_epoch(model, train_loader, optimizer,lossfunction):
+def train_epoch(model, train_loader, optimizer,lossfunction,args):
     totalprediction = []
     totallabels=[]
     totalTargets = []
@@ -76,7 +66,7 @@ def train_epoch(model, train_loader, optimizer,lossfunction):
     loss_meter = AvgMeter()
     tqdm_object = tqdm(train_loader, total=len(train_loader))
     for (x,y) in tqdm_object:
-        (x, y) = (x.to(device), y.to(device,dtype=torch.int64))
+        (x, y) = (x.to(args.device), y.to(args.device,dtype=torch.int64))
         prediction = model(x)
         loss = lossfunction(prediction,y)
         optimizer.zero_grad()
@@ -97,7 +87,7 @@ def train_epoch(model, train_loader, optimizer,lossfunction):
     totalprediction = torch.cat(totalprediction, dim=0)
     return loss_meter,acc,totalprediction,totallabels,totalTargets
 
-def valid_epoch(model, valid_loader,lossfunction):
+def valid_epoch(model, valid_loader,lossfunction,args):
     totalprediction = []
     totallabels=[]
     totalTargets = []
@@ -105,7 +95,7 @@ def valid_epoch(model, valid_loader,lossfunction):
     loss_meter = AvgMeter()
     tqdm_object = tqdm(valid_loader, total=len(valid_loader))
     for (x,y) in tqdm_object:
-        (x, y) = (x.to(device), y.to(device,dtype=torch.int64))
+        (x, y) = (x.to(args.device), y.to(args.device,dtype=torch.int64))
         prediction = model(x)
         loss = lossfunction(prediction,y)
 
@@ -124,11 +114,11 @@ def valid_epoch(model, valid_loader,lossfunction):
     totalprediction = torch.cat(totalprediction, dim=0)
     return loss_meter,acc,totalprediction,totallabels,totalTargets
 
-def build_loaders(clip_features,labels,mode):
+def build_loaders(clip_features,labels,args,mode):
     data_x = torch.Tensor(clip_features)
     data_y = torch.Tensor(labels)
     train_dataset = utils.data.TensorDataset(data_x, data_y)
-    dataloader = utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True if mode == "train" else False)
+    dataloader = utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True if mode == "train" else False)
     return dataloader
 
 class AvgMeter:
@@ -176,87 +166,86 @@ def save_object(obj, filename):
     with open(filename, 'wb') as outp:  # Overwrites any existing file.
         pickle.dump(obj, outp, pickle.HIGHEST_PROTOCOL)
 
+
 def main():
+    args = get_args()
+    ############### Load train combined clip features##################################
+    train_VN_FakeIm = np.load('./data/VisualNews/train_FakeIm_clip_features.npy')
+    train_VN_with_EvRep = np.load('./data/VisualNews/train_plus_EvRep_clip_features.npy')
+    train_ME_with_EvRep = np.load('./data/2015_data/train_plus_EvRep_clip_features.npy')
+    train_ME_FakeIm = np.load('./data/2015_data/train_FakeIm_clip_features.npy')
+    train_ME = np.load('./data/2015_data/train_clip_features.npy')
+
     ## find extra fake samples for ev_rep train VN:
     extra = pd.read_csv('./MediaEval_VN_data/VN_half_data/train.csv')
     extra_f = np.load('./MediaEval_VN_data/VN_half_data/VN_train_clip_features.npy')
-    extra=extra[extra['label_name']=='fake']
-    extra=extra[0:2000]
-    idx=extra.index.to_list()
-    extra_f=extra_f[idx]
+    extra = extra[extra['label_name'] == 'fake']
+    extra = extra[0:2000]
+    idx = extra.index.to_list()
+    extra_f = extra_f[idx]
+#################### Load valid combined features ######################################
+    valid_VN_FakeIm = np.load('./data/VisualNews/valid_FakeIm_clip_features.npy')
+    valid_VN_with_EvRep = np.load('./data/VisualNews/valid_plus_EvRep_clip_features.npy')
+    valid_ME_with_EvRep = np.load('./data/2015_data/valid_plus_EvRep_clip_features.npy')
+    valid_ME_FakeIm = np.load('./data/2015_data/valid_FakeIm_clip_features.npy')
+    valid_ME = np.load('./data/2015_data/valid_clip_features.npy')
+################### Load test data features ###########################################
+    test_clip_features = np.load('./data/2015_data/test_clip_features.npy')
+###################################### Load labels ############################################
+    df_train_VN_FakeIm = pd.read_csv('./data/VisualNews/train_FakeIm.csv')
+    df_train_VN_with_EvRep = pd.read_csv('./data/VisualNews/train_plus_EvRep.csv')
+    df_train_ME_with_EvRep = pd.read_csv('./data/2015_data/train_plus_EvRep.csv')
+    df_train_ME_FakeIm = pd.read_csv('./data/2015_data/train_FakeIm.csv')
+    df_train_ME = pd.read_csv('./data/2015_data/train.csv')
 
-    # Load combined clip features
-    train_clip_features_VN= np.load('./MediaEval_VN_data/VN_half_data/Im_rep/train_im_rep_features.npy')
-    train_clip_features_VN_ev=np.load('./MediaEval_VN_data/VN_half_data/VN_train_clip_features.npy')
-    #train_clip_features_ME = np.load('./MediaEval_VN_data/train_ME_clip_vitL_14_features.npy')
-    train_ME_manipulated_ev_features = np.load('./MediaEval_VN_data/ME_train_with_ev_rep_features2.npy')
-    train_ME_manipulated_image_features = np.load('./MediaEval_VN_data/ME_train_im_rep_features.npy')
+    df_valid_VN_FakeIm = pd.read_csv('./data/VisualNews/valid_FakeIm.csv')
+    df_valid_VN_with_EvRep= pd.read_csv('./data/VisualNews/valid_plus_EvRep.csv')
+    df_valid_ME_with_EvRep = pd.read_csv('./data/2015_data/valid_plus_EvRep.csv')
+    df_valid_ME_FakeIm = pd.read_csv('./data/2015_data/valid_FakeIm.csv')
+    df_valid_ME = pd.read_csv('./data/2015_data/valid.csv')
 
+    df_test = pd.read_csv('./data/2015_data/test.csv')
+################################## choose model and associated data ####################
+    if args.model=='clip-mlp':
+        train_clip_features=train_ME
+        valid_clip_features=valid_ME
+        df_train=df_train_ME
+        df_valid=df_valid_ME
 
-    train_clip_features=np.concatenate((train_clip_features_VN,
-            train_clip_features_VN_ev,
-            #train_clip_features_ME,
-            train_ME_manipulated_ev_features,train_ME_manipulated_image_features,
-            train_ME_manipulated_ev_features[8671:],extra_f),axis=0)
-    #train_clip_features=np.load('./well_distributed_data/train_clip_vitL_14_features.npy')
+    elif args.model=='VNME-Img':
+        train_clip_features = np.concatenate((train_VN_FakeIm,train_ME,train_ME_FakeIm), axis=0)
+        valid_clip_features=np.concatenate((valid_VN_FakeIm,valid_ME,valid_ME_FakeIm), axis=0)
+        df_train = pd.concat([df_train_VN_FakeIm, df_train_ME, df_train_ME_FakeIm], axis=0, ignore_index=True)
+        df_valid= pd.concat([df_valid_VN_FakeIm,df_valid_ME, df_valid_ME_FakeIm], axis=0,
+            ignore_index=True)
 
-    valid_clip_features_VN= np.load('./MediaEval_VN_data/VN_half_data/valid_bbc_im_rep_feature.npy')
-    valid_clip_features_VN_ev = np.load('./MediaEval_VN_data/VN_half_data/valid_bbc_clip_features.npy')
-    #valid_clip_features_ME = np.load('./MediaEval_VN_data/valid_ME_clip_vitL_14_features.npy')
-    valid_ME_manipulated_ev_features = np.load('./MediaEval_VN_data/ME_valid_with_ev_rep_features2.npy')
-    valid_ME_manipulated_image_features = np.load('./MediaEval_VN_data/ME_valid_im_rep_features.npy')
-    valid_clip_features=np.concatenate((valid_clip_features_VN,
-            valid_clip_features_VN_ev
-            #,valid_clip_features_ME
-            ,valid_ME_manipulated_ev_features,valid_ME_manipulated_image_features
-            ),axis=0)
-    #valid_clip_features=np.load('./MediaEval_VN_data/test_clip_vitL_14_features.npy')
+    elif args.model=='VNME-Evt':
+        train_clip_features = np.concatenate((train_VN_with_EvRep,train_ME_with_EvRep), axis=0)
+        valid_clip_features = np.concatenate((valid_VN_with_EvRep,valid_ME_with_EvRep), axis=0)
+        df_train= pd.concat([df_train_VN_with_EvRep,df_train_ME_with_EvRep], axis=0,
+            ignore_index=True)
+        df_valid= pd.concat([df_valid_VN_with_EvRep,df_valid_ME_with_EvRep], axis=0,
+            ignore_index=True)
 
+    elif args.model=='VNME-All':
+        #train_clip_features = np.concatenate((train_VN_with_FakeIm, train_VN_with_EvRep,
+        #                                      train_ME_with_EvRep, train_ME_FakeIm,
+        #                                      train_ME_with_EvRep[8671:], extra_f), axis=0)
+        train_clip_features = np.concatenate((train_VN_FakeIm,train_VN_with_EvRep,
+                                              train_ME_with_EvRep,train_ME_FakeIm), axis=0)
+        valid_clip_features = np.concatenate((valid_VN_FakeIm,valid_VN_with_EvRep,
+                                              valid_ME_with_EvRep, valid_ME_FakeIm), axis=0)
+        df_train = pd.concat([df_train_VN_FakeIm, df_train_VN_with_EvRep, df_train_ME_with_EvRep, df_train_ME_FakeIm], axis=0, ignore_index=True)
+        df_valid = pd.concat([df_valid_VN_FakeIm, df_valid_VN_with_EvRep, df_valid_ME_with_EvRep, df_valid_ME_FakeIm], axis=0,ignore_index=True)
 
-    test_clip_features= np.load('./MediaEval_VN_data/test_clip_vitL_14_features.npy')
-
-    #Load labels
-    df_train_VN=pd.read_csv('./MediaEval_VN_data\VN_half_data\Im_rep/train_im_rep.csv')
-    df_train_VN_ev = pd.read_csv('./MediaEval_VN_data/VN_half_data/train.csv')
-    #df_train_ME = pd.read_csv('./MediaEval_VN_data/train_ME.csv')
-    df_train_ME_manipulated_ev = pd.read_csv('./MediaEval_VN_data/ME_train_with_ev_rep.csv')
-    df_train_ME_manipulated_image = pd.read_csv('./MediaEval_VN_data/ME_train_im_rep.csv')
-    df_train=pd.concat([df_train_VN,
-            df_train_VN_ev
-            #,df_train_ME
-            ,df_train_ME_manipulated_ev,df_train_ME_manipulated_image,
-            df_train_ME_manipulated_ev[8671:],extra
-            ],axis=0,ignore_index=True)
-
-    #df_train=pd.read_csv('./well_distributed_data/train.csv')
-    #df_train['binary_labels'] = df_train['label'].apply(lambda x : 1 if x == "fake" else  0)
-    train_labels=df_train['label_name'].apply(lambda x : 1 if x == "real" else  0)
-
-    df_valid_VN=pd.read_csv('./MediaEval_VN_data/VN_half_data/valid_bbc_im_rep.csv')
-    df_valid_VN_ev = pd.read_csv('./MediaEval_VN_data/VN_half_data/valid_bbc.csv')
-    #df_valid_ME = pd.read_csv('./MediaEval_VN_data/valid_ME.csv')
-    df_valid_ME_manipulated_ev = pd.read_csv('./MediaEval_VN_data/ME_valid_with_ev_rep.csv')
-    df_valid_ME_manipulated_image = pd.read_csv('./MediaEval_VN_data/ME_valid_im_rep.csv')
-    df_valid=pd.concat([df_valid_VN
-            ,df_valid_VN_ev
-            #df_valid_ME ,
-            ,df_valid_ME_manipulated_ev,df_valid_ME_manipulated_image
-
-            ],axis=0,ignore_index=True)
-    #df_valid=pd.read_csv('./MediaEval_VN_data/test.csv')
-
-    #df_valid=pd.read_csv('./well_distributed_data/valid.csv')
-    #df_valid['binary_labels'] = df_valid['label'].apply(lambda x : 1 if x == "fake" else  0)
-    valid_labels=df_valid['label_name'].apply(lambda x : 1 if x == "real" else  0)
-
-    df_test=pd.read_csv('./MediaEval_VN_data/test.csv')
-    #df_test['binary_labels'] = df_test['label'].apply(lambda x : 1 if x == "fake" else  0)
+    train_labels = df_train['label_name'].apply(lambda x: 1 if x == "real" else 0)
+    valid_labels = df_valid['label_name'].apply(lambda x: 1 if x == "real" else 0)
     test_labels=df_test['label_name'].apply(lambda x : 1 if x == "real" else  0)
-
+####################################################################################
     currentTime=datetime.now().strftime("%m-%d-%Y_%H;%M;%S")
     lossfunction=nn.CrossEntropyLoss()
-    model = early_fusion_model(dropout).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    model = early_fusion_model(args.dropout).to(args.device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     #make output directory based on date-time
     d=currentTime
@@ -270,12 +259,11 @@ def main():
     outdir=d
     os.mkdir(outdir, mode=0o777)
     # build data Loaders
-    train_loader=build_loaders(train_clip_features,train_labels,mode="train")
-    valid_loader=build_loaders(valid_clip_features,valid_labels,mode="valid")
-    test_loader=build_loaders(test_clip_features,test_labels,mode="test")
+    train_loader=build_loaders(train_clip_features,train_labels,args,mode="train")
+    valid_loader=build_loaders(valid_clip_features,valid_labels,args,mode="valid")
+    test_loader=build_loaders(test_clip_features,test_labels,args,mode="test")
 
 ############################# MAIN LOOP############################################
-
     # initialize a dictionary to store training history
     H = {
          "train_loss": [],
@@ -286,14 +274,14 @@ def main():
 
     best_loss = float('inf')
     best_Acc=0
-    for epoch in range(epochs):
+    for epoch in range(args.epochs):
         print(f"Epoch: {epoch + 1}")
         model.train()
-        train_loss,train_Acc,_,trainlabels,traintargets = train_epoch(model, train_loader, optimizer,lossfunction)
+        train_loss,train_Acc,_,trainlabels,traintargets = train_epoch(model, train_loader, optimizer,lossfunction,args)
 
         model.eval()
         with torch.no_grad():
-            valid_loss,valid_Acc,_, validlabels, validtargets = valid_epoch(model, valid_loader,lossfunction)
+            valid_loss,valid_Acc,_, validlabels, validtargets = valid_epoch(model, valid_loader,lossfunction,args)
 
 
         if valid_loss.avg < best_loss:
@@ -310,10 +298,10 @@ def main():
             torch.save(bestmodel.state_dict(), outdir + "/best.pt")
             print("Saved Best Model!")
             CFG = {
-                "batch_size": [batch_size],
-                "epochs": [epochs],
-                "lr": [lr],
-                "dropout": [dropout]
+                "batch_size": [args.batch_size],
+                "epochs": [args.epochs],
+                "lr": [args.lr],
+                "dropout": [args.dropout]
             }
             cfg= pd.DataFrame(data=CFG)
             cfg.to_json(outdir+'/CFG.json')
@@ -341,16 +329,30 @@ def main():
     torch.save(model.state_dict(), outdir + "/best_last.pt")
 
     # save output Labels
-
     test_predictions=test_predictions.cpu().detach().numpy()
     id=list(range(len(testtargets)))
     out={'id':id,'targets': testtargets, 'predictions': testlabels,'prob class real':test_predictions[:,0],'prob class fake':test_predictions[:,1]}
     outdf= pd.DataFrame(data=out)
     outdf.to_csv(outdir+'/labels.csv',index=False )
-    print('complete')
+    print('completed')
+def get_args():
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--batch_size", default=64, type=int)
+    parser.add_argument("--lr", default=1e-5)
+    parser.add_argument("--epochs",default=30, type=int)
+    parser.add_argument("--device", default=torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+    parser.add_argument("--dropout", default=0.4)
+    parser.add_argument("--model", default='clip-mlp',help='choose between [clip-mlp,VNME-Img,VNME-Evt,VNME-Evt]')
+    args = parser.parse_args()
+
+    print(args)
+    return args
 
 if __name__=="__main__":
     main()
+
+
 
 
 
