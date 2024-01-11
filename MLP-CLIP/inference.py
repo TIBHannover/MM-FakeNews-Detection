@@ -6,7 +6,11 @@ import re
 import numpy as np
 from sklearn.metrics import classification_report
 
-
+rootdir_results='./MediaEval_VN_data/results\Im+Ev\early_fusion/10-04-2022_19;35;56/'
+CFG=pd.read_json(rootdir_results+'CFG.json')
+rootdir_data='./well_distributed_data/changed_image/'
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+lossfunction=nn.CrossEntropyLoss()
 def report_to_json(reports,outdir):
     import json
     reports['avg precision'] = reports['weighted avg']['precision']
@@ -20,12 +24,6 @@ def report_to_json(reports,outdir):
     #with open(outdir + '/Creports.json', 'w') as fp:
     with open(outdir+'changed_image/Creports_100samples_test.json', 'w') as fp:
         json.dump(reports, fp)
-
-rootdir_results='./MediaEval_VN_data/results\Im+Ev\early_fusion/10-04-2022_19;35;56/'
-CFG=pd.read_json(rootdir_results+'CFG.json')
-rootdir_data='./well_distributed_data/changed_image/'
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-lossfunction=nn.CrossEntropyLoss()
 
 # Load the model
 model=early_fusion_model(CFG.dropout[0])
@@ -50,8 +48,8 @@ with torch.no_grad():
 # generate classification reports
 testlabels = torch.tensor(testlabels, device='cpu')
 testtargets = torch.tensor(testtargets, device='cpu')
-#reports=classification_report(testtargets,testlabels, target_names=['fake','real'], output_dict=True)
-#report_to_json(reports,rootdir_results)
+reports=classification_report(testtargets,testlabels, target_names=['fake','real'], output_dict=True)
+report_to_json(reports,rootdir_results)
 
 # save output Labels
 test_predictions=test_predictions.cpu().detach().numpy()
@@ -59,6 +57,7 @@ id=list(range(len(testtargets)))
 out={'id':id,'targets': testtargets, 'predictions': testlabels,'prob class real':test_predictions[:,0],'prob class fake':test_predictions[:,1]}
 outdf= pd.DataFrame(data=out)
 outdf.to_csv(rootdir_results+'/changed_image/labels_100samples_test2.csv',index=False )
-#outdf.to_csv(rootdir_results+'/2/labels2.csv',index=False )
 print('complete')
+
+
 
