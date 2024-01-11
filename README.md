@@ -2,7 +2,7 @@
 
 # Improving Generalization for Multimodal Fake News Detection
 
-This repository is the official implementation of [Improving Generalization for Multimodal Fake News Detection](https://arxiv.org/abs/2205.12487). [Best Paper Honorable Mention at SIGIR 2023](https://dl.acm.org/doi/abs/10.1145/3591106.3592230). 
+This repository is the official implementation of [Improving Generalization for Multimodal Fake News Detection](https://dl.acm.org/doi/abs/10.1145/3591106.3592230). 
 
 Please use the following citation:
 ```
