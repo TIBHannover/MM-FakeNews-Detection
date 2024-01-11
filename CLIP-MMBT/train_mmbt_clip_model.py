@@ -15,7 +15,6 @@ from matplotlib import pyplot as plt
 import file_utils
 
 from datetime import datetime
-#from tqdm.notebook import tqdm
 from tqdm.autonotebook import tqdm
 
 from transformers import (
@@ -27,11 +26,10 @@ from transformers import (
     MMBTForClassification,
     get_linear_schedule_with_warmup,
 )
-num_image_embeds = 4
-num_labels = 1
-gradient_accumulation_steps = 10
+
+
 data_dir = './data/well_distributed_data'
-#data_dir = '/nfs/data/cleopatra/misogyny_detection/MAMI_2021'
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 now = datetime.now()
 model_dir_path = now.strftime("%d-%m-%Y %H;%M;%S").replace(" ", "_")
 
@@ -42,14 +40,20 @@ if not file_utils.path_exists(data_dir+ "/" + "mmbt_results"+model_dir_path):
     file_utils.create_folder(data_dir+ "/" + "mmbt_results"+model_dir_path)
 model_dir_path = data_dir+ "/" + "mmbt_results"+model_dir_path
 
-max_seq_length = 80
+
+
+constants={
+    'max_seq_length' : 80,
+    'num_image_embeds' : 4,
+    'num_labels' : 1,
+    'eval_batch_size' : 32,
+    'image_features_size' : 640
+}
 max_grad_norm = 0.5
 train_batch_size = 32
-eval_batch_size = 32
 image_encoder_size = 288
-image_features_size = 640
 num_train_epochs = 2
-
+gradient_accumulation_steps = 10
 def prepare_test_predictions(predictions):
     reports = classification_report(predictions['labels'], predictions['prediction'], target_names=['fake', 'real'], output_dict=True)
     reports['avg precision'] = reports['weighted avg']['precision']
@@ -293,7 +297,6 @@ def evaluate(model, tokenizer, criterion, dataloader, tres=0.5):
 
     return result
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 clip_model, preprocess = clip.load("RN50x4", device=device, jit=False)
 for p in clip_model.parameters():
