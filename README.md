@@ -45,7 +45,7 @@ You can download dataset (splits that we used along with extracted CLIP features
 
 - [https://tib.eu/cloud/s/FwfRYC5y9xZKtWF).
 
-To access the whole dataset of VisualNews with it images:
+To access the whole dataset of VisualNews with its images:
 
 - [https://tib.eu/cloud/s/FwfRYC5y9xZKtWF](https://github.com/FuxiaoLiu/VisualNews-Repository).
 
