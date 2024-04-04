@@ -41,9 +41,17 @@ To install requirements:
 
 ## Dataset 
 
-You can download dataset here:
+You can download dataset (splits that we used along with extracted CLIP features) here:
 
 - [https://tib.eu/cloud/s/FwfRYC5y9xZKtWF).
+
+To access the whole dataset of VisualNews with it images:
+
+- [https://tib.eu/cloud/s/FwfRYC5y9xZKtWF](https://github.com/FuxiaoLiu/VisualNews-Repository).
+
+To access the whole dataset of MediaEval 2015 and MediaEval 2016 with their images:
+
+- [https://tib.eu/cloud/s/FwfRYC5y9xZKtWF](https://github.com/FuxiaoLiu/VisualNews-Repository](https://github.com/MKLab-ITI/image-verification-corpus).
 
 
 ## Contributing
