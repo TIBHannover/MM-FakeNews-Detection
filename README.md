@@ -51,7 +51,7 @@ To access the whole dataset of VisualNews with its images:
 
 To access the whole dataset of MediaEval 2015 and MediaEval 2016 with their images:
 
-- [https://tib.eu/cloud/s/FwfRYC5y9xZKtWF](https://github.com/FuxiaoLiu/VisualNews-Repository](https://github.com/MKLab-ITI/image-verification-corpus).
+- [https://github.com/MKLab-ITI/image-verification-corpus).
 
 
 ## Contributing
